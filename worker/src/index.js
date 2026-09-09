@@ -68,34 +68,15 @@ async function admin(env, request, url, { allowExpired = false } = {}) {
     throw new Error("Password change required before accessing the dashboard.");
   return { user, profile: p[0], passwordChangeRequired };
 }
-async function sms(env, to, message) {
-  if (
-    !env.TWILIO_ACCOUNT_SID ||
-    !env.TWILIO_AUTH_TOKEN ||
-    !env.TWILIO_FROM_NUMBER
-  )
-    return;
-  const form = new URLSearchParams({
-    To: to,
-    From: env.TWILIO_FROM_NUMBER,
-    Body: message,
+async function email(env, to, subject, html) {
+  const functionUrl = env.SUPABASE_EMAIL_FUNCTION_URL;
+  if (!functionUrl) return;
+  const r = await fetch(functionUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ to, subject, html }),
   });
-  const r = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          "Basic " + btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: form,
-    },
-  );
-  if (!r.ok)
-    throw new Error(
-      "Registration saved, but the confirmation text could not be sent.",
-    );
+  if (!r.ok) throw new Error("Email delivery failed.");
 }
 async function settings(env) {
   const r = await sb(env, "parking_settings?id=eq.1&select=*");
@@ -105,6 +86,9 @@ async function register(env, request) {
   const x = await request.json(),
     plate = normalizePlate(x.plate),
     phone = normalizePhone(x.phone),
+    email = String(x.email || "").trim().toLowerCase(),
+    building = String(x.building || "").trim(),
+    unit_number = String(x.unit_number || "").trim(),
     stall = Number(x.stall),
     start = new Date(),
     duration = Number(x.duration_hours),
@@ -113,6 +97,8 @@ async function register(env, request) {
       : new Date(start.getTime() + duration * 36e5),
     now = new Date();
   if (plate.length < 2) throw new Error("Enter a valid licence plate.");
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+  if (!building || !unit_number) throw new Error("Building and unit number are required.");
   if (!Number.isInteger(stall))
     throw new Error("Select a visitor parking stall.");
   if (
@@ -164,6 +150,9 @@ async function register(env, request) {
     body: {
       plate,
       phone,
+      email,
+      building,
+      unit_number,
       stall_number: stall,
       start_at: start.toISOString(),
       end_at: end.toISOString(),
