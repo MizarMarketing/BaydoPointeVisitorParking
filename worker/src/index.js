@@ -68,9 +68,9 @@ async function admin(env, request, url, { allowExpired = false } = {}) {
     throw new Error("Password change required before accessing the dashboard.");
   return { user, profile: p[0], passwordChangeRequired };
 }
-async function email(env, to, subject, html) {
+async function sendEmail(env, to, subject, html) {
   const functionUrl = env.SUPABASE_EMAIL_FUNCTION_URL;
-  if (!functionUrl) return;
+  if (!functionUrl) throw new Error("Email is not configured.");
   const r = await fetch(functionUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -85,7 +85,7 @@ async function settings(env) {
 async function register(env, request) {
   const x = await request.json(),
     plate = normalizePlate(x.plate),
-    phone = normalizePhone(x.phone),
+    phone = null,
     email = String(x.email || "").trim().toLowerCase(),
     building = String(x.building || "").trim(),
     unit_number = String(x.unit_number || "").trim(),
@@ -159,9 +159,10 @@ async function register(env, request) {
       confirmation_code: code,
     },
   });
-  await sms(
+  await sendEmail(
     env,
-    phone,
+    email,
+    "Parking registration confirmed",
     `Baydo Pointe visitor parking registered. Plate ${plate}, stall ${stall}, valid until ${end.toLocaleString("en-CA", { timeZone: "America/Edmonton" })}. Confirmation ${code}.`,
   );
   return { confirmation_code: code };
@@ -176,9 +177,10 @@ async function reminders(env) {
   );
   for (const r of due) {
     try {
-      await sms(
+      await sendEmail(
         env,
-        r.phone,
+        r.email,
+        "Parking expires soon",
         `Reminder: visitor parking for ${r.plate}, stall ${r.stall_number}, expires at ${new Date(r.end_at).toLocaleString("en-CA", { timeZone: "America/Edmonton" })}.`,
       );
       await sb(env, `parking_registrations?id=eq.${r.id}`, {
@@ -196,6 +198,40 @@ async function reminders(env) {
   );
 }
 const csvCell = (v) => '"' + String(v ?? "").replaceAll('"', '""') + '"';
+async function extendParking(env, request) {
+  const x = await request.json();
+  const plate = normalizePlate(x.plate);
+  const address = String(x.email || "").trim().toLowerCase();
+  const code = String(x.confirmation_code || "").trim().toUpperCase();
+  const hours = Number(x.hours);
+  if (!plate || !address || !code) throw new Error("Email, plate and confirmation number are required.");
+  const records = await sb(env, `parking_registrations?plate=eq.${encodeURIComponent(plate)}&confirmation_code=eq.${encodeURIComponent(code)}&select=*`);
+  const r = records.find(v => String(v.email || "").toLowerCase() === address);
+  if (!r) throw new Error("Registration details do not match.");
+  const now = Date.now(), oldEnd = Date.parse(r.end_at), start = Date.parse(r.start_at);
+  if (r.status !== "active" || oldEnd <= now) throw new Error("Expired registrations cannot be extended.");
+  const cfg = await settings(env);
+  if (!Number.isFinite(hours) || hours <= 0 || !(cfg.duration_options || [2,4,8,24]).map(Number).includes(hours)) throw new Error("Select an available duration.");
+  const end = oldEnd + hours * 36e5;
+  if (end - start > cfg.max_stay_hours * 36e5) throw new Error("Total parking time exceeds Maximum stay.");
+  const overlap = await sb(env, `parking_registrations?id=neq.${r.id}&stall_number=eq.${r.stall_number}&status=eq.active&start_at=lt.${encodeURIComponent(new Date(end).toISOString())}&end_at=gt.${encodeURIComponent(r.end_at)}&select=id`);
+  if (overlap.length) throw new Error("This stall is reserved during the extended time.");
+  const windowMs = cfg.rolling_days * 864e5;
+  const history = await sb(env, `parking_registrations?plate=eq.${encodeURIComponent(plate)}&status=neq.cancelled&end_at=gt.${encodeURIComponent(new Date(start-windowMs).toISOString())}&select=id,start_at,end_at`);
+  const intervals = history.filter(v => v.id !== r.id).map(v => [Date.parse(v.start_at),Date.parse(v.end_at)]);
+  intervals.push([start,end]);
+  const checkpoints = intervals.flatMap(([a,b]) => [b,a+windowMs]);
+  for (const t of checkpoints) {
+    const usage = intervals.reduce((n,[a,b]) => n + Math.max(0,Math.min(b,t)-Math.max(a,t-windowMs)),0);
+    if (usage > cfg.max_days_in_period * 864e5) throw new Error("Extension exceeds the rolling-period parking allowance.");
+  }
+  const updated = await sb(env, `parking_registrations?id=eq.${r.id}&end_at=eq.${encodeURIComponent(r.end_at)}&status=eq.active`, {method:"PATCH",body:{end_at:new Date(end).toISOString(),reminder_sent_at:null}});
+  if (!updated?.length) throw new Error("Registration changed. Please refresh before trying again.");
+  let email_sent = true;
+  try { await sendEmail(env,address,"Parking time extended",`Your parking has been extended. New expiry: ${new Date(end).toISOString()}. Confirmation: ${code}`); }
+  catch { email_sent = false; }
+  return {end_at:new Date(end).toISOString(),email_sent};
+}
 export default {
   async fetch(request, env) {
     const h = cors(env);
@@ -228,6 +264,8 @@ export default {
       }
       if (url.pathname === "/api/register" && request.method === "POST")
         return json(await register(env, request), 201, h);
+      if (url.pathname === "/api/extend" && request.method === "POST")
+        return json(await extendParking(env, request), 200, h);
       if (url.pathname === "/api/admin/session") {
         const a = await admin(env, request, url, { allowExpired: true });
         return json(

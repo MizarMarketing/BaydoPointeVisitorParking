@@ -163,11 +163,39 @@ function Register() {
           registration details are invalid or expired.
         </small>
       </form>
+      <ExtendParking options={settings?.duration_options || []} />
       <a className="admin-link" href="/admin">
         Staff login
       </a>
     </main>
   );
+}
+
+function ExtendParking({ options }) {
+  const [form, setForm] = useState({ email: "", plate: "", confirmation_code: "", hours: "" });
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const submit = async (event) => {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true); setMessage("");
+    try {
+      const result = await api("/api/extend", { method: "POST", body: JSON.stringify(form) });
+      setMessage(`Parking extended. New expiry: ${new Date(result.end_at).toLocaleString()}.${result.email_sent ? " Confirmation email sent." : " Email could not be sent; your extension is saved."}`);
+      setForm({ ...form, hours: "" });
+    } catch (error) { setMessage(error.message); }
+    finally { setBusy(false); }
+  };
+  return <details className="card"><summary>Extend parking time</summary>
+    <p>Additional hours are added to your current expiry. Total stay and rolling-period limits still apply.</p>
+    <form onSubmit={submit}>
+      <label>Email<input required type="email" value={form.email} onChange={e => setForm({...form,email:e.target.value})}/></label>
+      <label>Licence plate<input required maxLength={12} value={form.plate} onChange={e => setForm({...form,plate:e.target.value})}/></label>
+      <label>Confirmation number<input required value={form.confirmation_code} onChange={e => setForm({...form,confirmation_code:e.target.value})}/></label>
+      <label>Additional hours<select required value={form.hours} onChange={e => setForm({...form,hours:e.target.value})}><option value="">Select duration</option>{options.map(h => <option key={h} value={h}>{h} hours</option>)}</select></label>
+      <button disabled={busy}>{busy ? "Extending…" : "Extend parking"}</button>
+      {message && <p role="status">{message}</p>}
+    </form></details>;
 }
 
 function PasswordChange({ onComplete }) {
@@ -568,4 +596,3 @@ start().catch((e) =>
     </main>,
   ),
 );
-
