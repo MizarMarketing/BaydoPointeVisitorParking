@@ -6,6 +6,11 @@ import "./style.css";
 const API = import.meta.env.VITE_API_URL || "";
 let supabase;
 const cleanPlate = (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, "");
+const localNow = () => {
+  const d = new Date();
+  const pad = (v) => String(v).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
 async function api(path, options = {}) {
   const {
     data: { session },
@@ -29,7 +34,7 @@ function Register() {
       plate: "",
       phone: "",
       stall: "",
-      start_at: "",
+      start_at: localNow(),
       duration_hours: "",
     }),
     [msg, setMsg] = useState(""),
@@ -49,6 +54,7 @@ function Register() {
         body: JSON.stringify({
           ...form,
           plate: cleanPlate(form.plate),
+          start_at: new Date().toISOString(),
           duration_hours: Number(form.duration_hours),
         }),
       });
@@ -57,7 +63,7 @@ function Register() {
         plate: "",
         phone: "",
         stall: "",
-        start_at: "",
+        start_at: localNow(),
         duration_hours: "",
       });
     } catch (e) {
@@ -118,6 +124,7 @@ function Register() {
             <input
               required
               type="datetime-local"
+              readOnly
               value={form.start_at}
               onChange={(e) => setForm({ ...form, start_at: e.target.value })}
             />
