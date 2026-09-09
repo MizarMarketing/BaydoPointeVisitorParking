@@ -11,6 +11,7 @@ Production-ready starter for a public visitor registration page and a protected 
 - One-year dashboard view and full CSV export
 - Cloudflare scheduled job every 10 minutes for reminders
 - Supabase Auth for staff and service-role-only access to parking records
+- Mandatory staff email/password sign-in and a 180-day password rotation policy enforced by both the dashboard and Worker API
 
 ## 1. Supabase
 
