@@ -1,17 +1,13 @@
 name = "baydopointevisitorparkingweb"
 main = "worker/src/index.js"
 compatibility_date = "2026-08-01"
+keep_vars = true
 
 [assets]
 directory = "./dist"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
-
-[vars]
-ALLOWED_ORIGIN = "*"
-SUPABASE_URL = "https://mrqlkqfuroynesjffrbk.supabase.coo"
-REMINDER_MINUTES = "60"
 
 [triggers]
 crons = ["*/10 * * * *", "15 8 * * *"]
