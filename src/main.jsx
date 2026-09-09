@@ -33,6 +33,8 @@ function Register() {
     [form, setForm] = useState({
       plate: "",
       email: "",
+      building: "",
+      unit_number: "",
       stall: "",
       start_at: localNow(),
       duration_hours: "",
@@ -62,6 +64,8 @@ function Register() {
       setForm({
         plate: "",
         email: "",
+        building: "",
+        unit_number: "",
         stall: "",
         start_at: localNow(),
         duration_hours: "",
@@ -129,6 +133,7 @@ function Register() {
               onChange={(e) => setForm({ ...form, start_at: e.target.value })}
             />
           </label>
+          <div className="form-grid"><label>Building<select required value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })}><option value="">Select building</option><option>370 Clareview Station Dr NW</option><option>374 Clareview Station Dr NW</option><option>378 Clareview Station Dr NW</option></select></label><label>Unit number<input required value={form.unit_number} placeholder="e.g. 1204" onChange={(e) => setForm({ ...form, unit_number: e.target.value })} /></label></div>
           <label>
             Parking duration
             <select
@@ -143,7 +148,7 @@ function Register() {
         </div>
         <label className="agree">
           <input required type="checkbox" /> I confirm the information is
-          correct and consent to parking-related text messages.
+          correct and consent to parking-related email messages.
         </label>
         <button disabled={busy}>
           {busy ? "Registering…" : "Register vehicle"}
@@ -559,3 +564,4 @@ start().catch((e) =>
     </main>,
   ),
 );
+
