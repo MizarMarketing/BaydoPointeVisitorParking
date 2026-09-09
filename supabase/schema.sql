@@ -3,8 +3,11 @@ create extension if not exists pgcrypto;
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   role text not null default 'viewer' check (role in ('admin','manager','viewer')),
+  password_changed_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists password_changed_at timestamptz not null default now();
 
 create table if not exists public.parking_settings (
   id smallint primary key default 1 check (id = 1),
