@@ -23,9 +23,9 @@ Copy the project URL, anon key, and service role key from Supabase project setti
 
 Create a Canadian SMS-capable Twilio number. Obtain the Account SID, Auth Token, and sending number. Trial accounts can normally text only verified recipient numbers.
 
-## 3. Worker API
+## 3. Combined Cloudflare Worker
 
-Install dependencies with `npm install`. Update `SUPABASE_URL` and `ALLOWED_ORIGIN` in `wrangler.toml`, then add secrets:
+The Worker serves the Vite frontend at `/`, the protected dashboard at `/admin`, and the API at `/api/*`. Install dependencies with `npm install`. Update `SUPABASE_URL` and `ALLOWED_ORIGIN` in `wrangler.toml`, then add secrets:
 
 ```bash
 npx wrangler secret put SUPABASE_ANON_KEY
@@ -33,10 +33,11 @@ npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 npx wrangler secret put TWILIO_ACCOUNT_SID
 npx wrangler secret put TWILIO_AUTH_TOKEN
 npx wrangler secret put TWILIO_FROM_NUMBER
+npm run build
 npm run worker:deploy
 ```
 
-The Worker URL returned by Cloudflare becomes `VITE_API_URL`.
+Because the frontend and API share one origin, `VITE_API_URL` may be left blank. The Worker URL is the public application URL.
 
 ## 4. Frontend on Cloudflare Pages
 
