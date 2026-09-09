@@ -97,6 +97,10 @@ function Register() {
             onChange={(e) => setForm({ ...form, plate: e.target.value })}
           />
         </label>
+        <div className="row">
+          <label>Building<select required value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })}><option value="">Select building</option><option value="370 Clareview Station Dr NW">370 Clareview Station Dr NW</option><option value="374 Clareview Station Dr NW">374 Clareview Station Dr NW</option><option value="378 Clareview Station Dr NW">378 Clareview Station Dr NW</option></select></label>
+          <label>Unit number<input required value={form.unit_number} placeholder="e.g. 1204" onChange={(e) => setForm({ ...form, unit_number: e.target.value })} /></label>
+        </div>
         <label>
           Email address
           <input
