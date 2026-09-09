@@ -68,34 +68,15 @@ async function admin(env, request, url, { allowExpired = false } = {}) {
     throw new Error("Password change required before accessing the dashboard.");
   return { user, profile: p[0], passwordChangeRequired };
 }
-async function sms(env, to, message) {
-  if (
-    !env.TWILIO_ACCOUNT_SID ||
-    !env.TWILIO_AUTH_TOKEN ||
-    !env.TWILIO_FROM_NUMBER
-  )
-    return;
-  const form = new URLSearchParams({
-    To: to,
-    From: env.TWILIO_FROM_NUMBER,
-    Body: message,
+async function email(env, to, subject, html) {
+  const functionUrl = env.SUPABASE_EMAIL_FUNCTION_URL;
+  if (!functionUrl) return;
+  const r = await fetch(functionUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ to, subject, html }),
   });
-  const r = await fetch(
-    `https://api.twilio.com/2010-04-01/Accounts/${env.TWILIO_ACCOUNT_SID}/Messages.json`,
-    {
-      method: "POST",
-      headers: {
-        Authorization:
-          "Basic " + btoa(`${env.TWILIO_ACCOUNT_SID}:${env.TWILIO_AUTH_TOKEN}`),
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: form,
-    },
-  );
-  if (!r.ok)
-    throw new Error(
-      "Registration saved, but the confirmation text could not be sent.",
-    );
+  if (!r.ok) throw new Error("Email delivery failed.");
 }
 async function settings(env) {
   const r = await sb(env, "parking_settings?id=eq.1&select=*");
