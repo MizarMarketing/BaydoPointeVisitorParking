@@ -85,7 +85,7 @@ async function settings(env) {
 async function register(env, request) {
   const x = await request.json(),
     plate = normalizePlate(x.plate),
-    phone = normalizePhone(x.phone),
+    phone = normalizePhone(x.phone),\n    email = String(x.email || "").trim().toLowerCase(),
     email = String(x.email || "").trim().toLowerCase(),
     building = String(x.building || "").trim(),
     unit_number = String(x.unit_number || "").trim(),
@@ -96,7 +96,7 @@ async function register(env, request) {
       ? new Date(x.end_at)
       : new Date(start.getTime() + duration * 36e5),
     now = new Date();
-  if (plate.length < 2) throw new Error("Enter a valid licence plate.");
+  if (plate.length < 2) throw new Error("Enter a valid licence plate.");\n  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
   if (!["370 Clareview Station Dr NW", "374 Clareview Station Dr NW", "378 Clareview Station Dr NW"].includes(building)) throw new Error("Select a building.");
   if (!unit_number) throw new Error("Enter a unit number.");
