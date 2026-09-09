@@ -107,7 +107,10 @@ async function register(env, request) {
     phone = normalizePhone(x.phone),
     stall = Number(x.stall),
     start = new Date(x.start_at),
-    end = new Date(x.end_at),
+    duration = Number(x.duration_hours),
+    end = x.end_at
+      ? new Date(x.end_at)
+      : new Date(start.getTime() + duration * 36e5),
     now = new Date();
   if (plate.length < 2) throw new Error("Enter a valid licence plate.");
   if (!Number.isInteger(stall))
@@ -121,6 +124,11 @@ async function register(env, request) {
   if (start < new Date(now.getTime() - 15 * 60000))
     throw new Error("Start time cannot be in the past.");
   const cfg = await settings(env);
+  const durations = Array.isArray(cfg.duration_options)
+    ? cfg.duration_options.map(Number)
+    : [2, 4, 8, 24];
+  if (!durations.includes(duration))
+    throw new Error("Select one of the available parking durations.");
   if (stall < 1 || stall > cfg.stall_count)
     throw new Error("That visitor stall does not exist.");
   if ((end - start) / 36e5 > cfg.max_stay_hours)
@@ -223,6 +231,7 @@ export default {
           {
             stalls: Array.from({ length: s.stall_count }, (_, i) => i + 1),
             max_stay_hours: s.max_stay_hours,
+            duration_options: s.duration_options || [2, 4, 8, 24],
           },
           200,
           h,
@@ -274,12 +283,23 @@ export default {
           max_stay_hours: Number(x.max_stay_hours),
           rolling_days: Number(x.rolling_days),
           max_days_in_period: Number(x.max_days_in_period),
+          duration_options: [
+            ...new Set(
+              (Array.isArray(x.duration_options)
+                ? x.duration_options
+                : String(x.duration_options || "").split(",")
+              )
+                .map(Number)
+                .filter((v) => Number.isInteger(v) && v > 0 && v <= 168),
+            ),
+          ].sort((a, b) => a - b),
           updated_at: new Date().toISOString(),
         };
         if (
           Object.values(safe)
             .slice(0, 4)
-            .some((v) => !Number.isInteger(v) || v < 1)
+            .some((v) => !Number.isInteger(v) || v < 1) ||
+          !safe.duration_options.length
         )
           throw new Error("All parking rules must be positive whole numbers.");
         const r = await sb(env, "parking_settings?id=eq.1", {
