@@ -24,7 +24,10 @@ alter table public.parking_settings add column if not exists duration_options js
 create table if not exists public.parking_registrations (
   id uuid primary key default gen_random_uuid(),
   plate text not null,
-  phone text not null,
+  phone text,
+  email text,
+  building text,
+  unit_number text,
   stall_number integer not null,
   start_at timestamptz not null,
   end_at timestamptz not null,
@@ -52,3 +55,4 @@ revoke all on public.parking_settings from anon, authenticated;
 
 -- Supabase dashboard: after creating the first staff user, promote them once:
 -- update public.profiles set role='admin' where id=(select id from auth.users where email='you@example.com');
+
