@@ -25,14 +25,17 @@ async function sb(
   { method = "GET", body, token, service = true } = {},
 ) {
   const key = service ? env.SUPABASE_SERVICE_ROLE_KEY : env.SUPABASE_ANON_KEY;
+  const headers = {
+    apikey: key,
+    "Content-Type": "application/json",
+    Prefer: "return=representation",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  else if (!String(key || "").startsWith("sb_"))
+    headers.Authorization = `Bearer ${key}`;
   const r = await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`, {
     method,
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${token || key}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-    },
+    headers,
     body: body && JSON.stringify(body),
   });
   if (!r.ok) throw new Error((await r.text()) || "Database request failed");
@@ -202,6 +205,18 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { headers: h });
     const url = new URL(request.url);
     try {
+      if (url.pathname === "/api/public/config") {
+        if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY)
+          throw new Error("Supabase runtime variables are not configured.");
+        return json(
+          {
+            supabase_url: env.SUPABASE_URL,
+            supabase_anon_key: env.SUPABASE_ANON_KEY,
+          },
+          200,
+          h,
+        );
+      }
       if (url.pathname === "/api/public/settings") {
         const s = await settings(env);
         return json(
