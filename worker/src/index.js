@@ -106,7 +106,7 @@ async function register(env, request) {
     plate = normalizePlate(x.plate),
     phone = normalizePhone(x.phone),
     stall = Number(x.stall),
-    start = new Date(x.start_at),
+    start = new Date(),
     duration = Number(x.duration_hours),
     end = x.end_at
       ? new Date(x.end_at)
