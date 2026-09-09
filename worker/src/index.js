@@ -105,6 +105,9 @@ async function register(env, request) {
   const x = await request.json(),
     plate = normalizePlate(x.plate),
     phone = normalizePhone(x.phone),
+    email = String(x.email || "").trim().toLowerCase(),
+    building = String(x.building || "").trim(),
+    unit_number = String(x.unit_number || "").trim(),
     stall = Number(x.stall),
     start = new Date(),
     duration = Number(x.duration_hours),
@@ -113,6 +116,9 @@ async function register(env, request) {
       : new Date(start.getTime() + duration * 36e5),
     now = new Date();
   if (plate.length < 2) throw new Error("Enter a valid licence plate.");
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+  if (!["370 Clareview Station Dr NW", "374 Clareview Station Dr NW", "378 Clareview Station Dr NW"].includes(building)) throw new Error("Select a building.");
+  if (!unit_number) throw new Error("Enter a unit number.");
   if (!Number.isInteger(stall))
     throw new Error("Select a visitor parking stall.");
   if (
@@ -164,6 +170,9 @@ async function register(env, request) {
     body: {
       plate,
       phone,
+      email,
+      building,
+      unit_number,
       stall_number: stall,
       start_at: start.toISOString(),
       end_at: end.toISOString(),
@@ -345,3 +354,4 @@ export default {
     await reminders(env);
   },
 };
+
