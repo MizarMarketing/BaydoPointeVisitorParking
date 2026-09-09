@@ -137,7 +137,7 @@ function Register() {
               onChange={(e) => setForm({ ...form, start_at: e.target.value })}
             />
           </label>
-          <div className="form-grid"><label>Building<select required value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })}><option value="">Select building</option><option>370 Clareview Station Dr NW</option><option>374 Clareview Station Dr NW</option><option>378 Clareview Station Dr NW</option></select></label><label>Unit number<input required value={form.unit_number} placeholder="e.g. 1204" onChange={(e) => setForm({ ...form, unit_number: e.target.value })} /></label></div>
+          
           <label>
             Parking duration
             <select
