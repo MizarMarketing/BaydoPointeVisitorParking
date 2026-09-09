@@ -13,11 +13,13 @@ create table if not exists public.parking_settings (
   id smallint primary key default 1 check (id = 1),
   stall_count integer not null default 20 check (stall_count > 0),
   max_stay_hours integer not null default 24 check (max_stay_hours > 0),
+  duration_options jsonb not null default '[2,4,8,24]'::jsonb,
   rolling_days integer not null default 30 check (rolling_days > 0),
   max_days_in_period integer not null default 7 check (max_days_in_period > 0),
   updated_at timestamptz not null default now()
 );
 insert into public.parking_settings(id) values(1) on conflict do nothing;
+alter table public.parking_settings add column if not exists duration_options jsonb not null default '[2,4,8,24]'::jsonb;
 
 create table if not exists public.parking_registrations (
   id uuid primary key default gen_random_uuid(),
