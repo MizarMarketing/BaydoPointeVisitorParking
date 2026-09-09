@@ -4,7 +4,7 @@ import{createClient}from'@supabase/supabase-js';
 import'./style.css';
 
 const API=import.meta.env.VITE_API_URL||'';
-const supabase=createClient(import.meta.env.VITE_SUPABASE_URL,import.meta.env.VITE_SUPABASE_ANON_KEY);
+let supabase;
 const cleanPlate=v=>v.toUpperCase().replace(/[^A-Z0-9]/g,'');
 async function api(path,options={}){const{data:{session}}=await supabase.auth.getSession();const r=await fetch(API+path,{...options,headers:{'Content-Type':'application/json',...(session?{Authorization:`Bearer ${session.access_token}`}:{}) ,...options.headers}});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.error||'Request failed');return b}
 
@@ -25,4 +25,10 @@ function Admin(){const[session,setSession]=useState(null),[checked,setChecked]=u
  if(mustChange)return <PasswordChange onComplete={async()=>{setMustChange(false);await load()}}/>;
  const save=async e=>{e.preventDefault();try{await api('/api/admin/settings',{method:'PUT',body:JSON.stringify(settings)});await load()}catch(x){setError(x.message)}};
  return <main className="dashboard"><header><div><span className="eyebrow">BAYDO POINTE</span><h1>Visitor Parking</h1></div><div><button className="secondary" onClick={()=>location.href=API+'/api/admin/export?token='+session.access_token}>Download CSV</button> <button className="secondary" onClick={()=>supabase.auth.signOut()}>Sign out</button></div></header><section className="stats"><div><b>{rows.filter(x=>new Date(x.end_at)>new Date()).length}</b><span>Active vehicles</span></div><div><b>{settings?.stall_count||0}</b><span>Visitor stalls</span></div><div><b>{rows.length}</b><span>Records shown</span></div></section>{settings&&<form className="settings" onSubmit={save}><h2>Parking rules</h2><label>Number of stalls<input type="number" min="1" value={settings.stall_count} onChange={e=>setSettings({...settings,stall_count:+e.target.value})}/></label><label>Maximum stay (hours)<input type="number" min="1" value={settings.max_stay_hours} onChange={e=>setSettings({...settings,max_stay_hours:+e.target.value})}/></label><label>Rolling period (days)<input type="number" min="1" value={settings.rolling_days} onChange={e=>setSettings({...settings,rolling_days:+e.target.value})}/></label><label>Maximum parked days<input type="number" min="1" value={settings.max_days_in_period} onChange={e=>setSettings({...settings,max_days_in_period:+e.target.value})}/></label><button>Save rules</button></form>}<section className="table-card"><h2>Registration list</h2>{error&&<div className="message error">{error}</div>}<div className="table-wrap"><table><thead><tr><th>Status</th><th>Plate</th><th>Stall</th><th>Phone</th><th>Start</th><th>End</th><th>Code</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td><span className={new Date(r.end_at)>new Date()?'pill active':'pill'}>{new Date(r.end_at)>new Date()?'Active':'Expired'}</span></td><td><b>{r.plate}</b></td><td>{r.stall_number}</td><td>{r.phone}</td><td>{new Date(r.start_at).toLocaleString()}</td><td>{new Date(r.end_at).toLocaleString()}</td><td>{r.confirmation_code}</td></tr>)}</tbody></table></div></section></main>}
-createRoot(document.getElementById('root')).render(location.pathname.startsWith('/admin')?<Admin/>:<Register/>);
+async function start(){
+ let url=import.meta.env.VITE_SUPABASE_URL,key=import.meta.env.VITE_SUPABASE_ANON_KEY;
+ if(!url||!key){const r=await fetch(API+'/api/public/config');const c=await r.json().catch(()=>({}));if(!r.ok)throw new Error(c.error||'Unable to load application configuration.');url=c.supabase_url;key=c.supabase_anon_key}
+ supabase=createClient(url,key);
+ createRoot(document.getElementById('root')).render(location.pathname.startsWith('/admin')?<Admin/>:<Register/>);
+}
+start().catch(e=>createRoot(document.getElementById('root')).render(<main className="shell narrow"><section className="hero"><span className="eyebrow">CONFIGURATION ERROR</span><h1>Unable to start</h1><p>{e.message}</p></section></main>));
