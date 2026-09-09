@@ -1,33 +1,536 @@
-import React,{useEffect,useState}from'react';
-import{createRoot}from'react-dom/client';
-import{createClient}from'@supabase/supabase-js';
-import'./style.css';
+import React, { useEffect, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { createClient } from "@supabase/supabase-js";
+import "./style.css";
 
-const API=import.meta.env.VITE_API_URL||'';
+const API = import.meta.env.VITE_API_URL || "";
 let supabase;
-const cleanPlate=v=>v.toUpperCase().replace(/[^A-Z0-9]/g,'');
-async function api(path,options={}){const{data:{session}}=await supabase.auth.getSession();const r=await fetch(API+path,{...options,headers:{'Content-Type':'application/json',...(session?{Authorization:`Bearer ${session.access_token}`}:{}) ,...options.headers}});const b=await r.json().catch(()=>({}));if(!r.ok)throw new Error(b.error||'Request failed');return b}
-
-function Register(){const[settings,setSettings]=useState(null),[form,setForm]=useState({plate:'',phone:'',stall:'',start_at:'',end_at:''}),[msg,setMsg]=useState(''),[busy,setBusy]=useState(false);
- useEffect(()=>{api('/api/public/settings').then(setSettings).catch(e=>setMsg(e.message))},[]);
- const submit=async e=>{e.preventDefault();setBusy(true);setMsg('');try{const r=await api('/api/register',{method:'POST',body:JSON.stringify({...form,plate:cleanPlate(form.plate)})});setMsg(`Registration successful. Confirmation #${r.confirmation_code}`);setForm({plate:'',phone:'',stall:'',start_at:'',end_at:''})}catch(e){setMsg(e.message)}finally{setBusy(false)}};
- return <main className="shell"><section className="hero"><span className="eyebrow">BAYDO POINTE</span><h1>Visitor Parking</h1><p>Register your vehicle before parking. A confirmation and expiry reminder will be sent by text.</p></section><form className="card" onSubmit={submit}><label>Licence plate<input required maxLength="12" placeholder="ABC 123" value={form.plate} onChange={e=>setForm({...form,plate:e.target.value})}/></label><label>Mobile phone<input required type="tel" placeholder="+1 780 555 0123" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></label><label>Visitor parking stall<select required value={form.stall} onChange={e=>setForm({...form,stall:e.target.value})}><option value="">Select a stall</option>{settings?.stalls?.map(s=><option key={s} value={s}>Visitor {s}</option>)}</select></label><div className="row"><label>Start time<input required type="datetime-local" value={form.start_at} onChange={e=>setForm({...form,start_at:e.target.value})}/></label><label>End time<input required type="datetime-local" value={form.end_at} onChange={e=>setForm({...form,end_at:e.target.value})}/></label></div><label className="agree"><input required type="checkbox"/> I confirm the information is correct and consent to parking-related text messages.</label><button disabled={busy}>{busy?'Registering…':'Register vehicle'}</button>{msg&&<div className="message">{msg}</div>}<small>Maximum stay and usage limits apply. Vehicles may be towed if registration details are invalid or expired.</small></form><a className="admin-link" href="/admin">Staff login</a></main>}
-
-function PasswordChange({onComplete}){const[password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);const submit=async e=>{e.preventDefault();setError('');if(password.length<10)return setError('Use at least 10 characters.');if(password!==confirm)return setError('Passwords do not match.');setBusy(true);try{const{error:updateError}=await supabase.auth.updateUser({password});if(updateError)throw updateError;await api('/api/admin/password-changed',{method:'POST'});await onComplete()}catch(x){setError(x.message)}finally{setBusy(false)}};return <main className="shell narrow"><section className="hero"><span className="eyebrow">SECURITY UPDATE</span><h1>Change password</h1><p>Your staff password must be changed every 180 days before you can access the dashboard.</p></section><form className="card" onSubmit={submit}><label>New password<input required minLength="10" type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/></label><label>Confirm new password<input required minLength="10" type="password" autoComplete="new-password" value={confirm} onChange={e=>setConfirm(e.target.value)}/></label><button disabled={busy}>{busy?'Updating…':'Change password'}</button>{error&&<div className="message error">{error}</div>}<button type="button" className="text-button" onClick={()=>supabase.auth.signOut()}>Sign out</button></form></main>}
-
-function Admin(){const[session,setSession]=useState(null),[checked,setChecked]=useState(true),[mustChange,setMustChange]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[rows,setRows]=useState([]),[settings,setSettings]=useState(null),[error,setError]=useState('');
- useEffect(()=>{supabase.auth.getSession().then(({data})=>{setSession(data.session);setChecked(!data.session)}).catch(e=>{setError(e.message);setChecked(true)});const{data:{subscription}}=supabase.auth.onAuthStateChange((_,s)=>{setSession(s);setChecked(!s)});return()=>subscription.unsubscribe()},[]);
- const checkSession=async()=>{if(!session){setChecked(true);return}try{const result=await api('/api/admin/session');setMustChange(result.password_change_required);setError('')}catch(e){setError(e.message);await supabase.auth.signOut()}finally{setChecked(true)}};
- const load=async()=>{try{const[r,s]=await Promise.all([api('/api/admin/registrations'),api('/api/admin/settings')]);setRows(r.registrations);setSettings(s);setError('')}catch(e){setError(e.message)}};
- useEffect(()=>{checkSession()},[session]);useEffect(()=>{if(session&&checked&&!mustChange)load()},[session,checked,mustChange]);
- if(!checked)return <main className="shell narrow"><section className="hero"><span className="eyebrow">STAFF PORTAL</span><h1>Checking access…</h1></section></main>;
- if(!session)return <main className="shell narrow"><section className="hero"><span className="eyebrow">STAFF PORTAL</span><h1>Parking Admin</h1><p>Authorized staff only.</p></section><form className="card" onSubmit={async e=>{e.preventDefault();setError('');const{error:loginError}=await supabase.auth.signInWithPassword({email,password});if(loginError)setError(loginError.message)}}><label>Email<input required autoComplete="username" type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Password<input required autoComplete="current-password" type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label><button>Sign in</button>{error&&<div className="message error">{error}</div>}</form></main>;
- if(mustChange)return <PasswordChange onComplete={async()=>{setMustChange(false);await load()}}/>;
- const save=async e=>{e.preventDefault();try{await api('/api/admin/settings',{method:'PUT',body:JSON.stringify(settings)});await load()}catch(x){setError(x.message)}};
- return <main className="dashboard"><header><div><span className="eyebrow">BAYDO POINTE</span><h1>Visitor Parking</h1></div><div><button className="secondary" onClick={()=>location.href=API+'/api/admin/export?token='+session.access_token}>Download CSV</button> <button className="secondary" onClick={()=>supabase.auth.signOut()}>Sign out</button></div></header><section className="stats"><div><b>{rows.filter(x=>new Date(x.end_at)>new Date()).length}</b><span>Active vehicles</span></div><div><b>{settings?.stall_count||0}</b><span>Visitor stalls</span></div><div><b>{rows.length}</b><span>Records shown</span></div></section>{settings&&<form className="settings" onSubmit={save}><h2>Parking rules</h2><label>Number of stalls<input type="number" min="1" value={settings.stall_count} onChange={e=>setSettings({...settings,stall_count:+e.target.value})}/></label><label>Maximum stay (hours)<input type="number" min="1" value={settings.max_stay_hours} onChange={e=>setSettings({...settings,max_stay_hours:+e.target.value})}/></label><label>Rolling period (days)<input type="number" min="1" value={settings.rolling_days} onChange={e=>setSettings({...settings,rolling_days:+e.target.value})}/></label><label>Maximum parked days<input type="number" min="1" value={settings.max_days_in_period} onChange={e=>setSettings({...settings,max_days_in_period:+e.target.value})}/></label><button>Save rules</button></form>}<section className="table-card"><h2>Registration list</h2>{error&&<div className="message error">{error}</div>}<div className="table-wrap"><table><thead><tr><th>Status</th><th>Plate</th><th>Stall</th><th>Phone</th><th>Start</th><th>End</th><th>Code</th></tr></thead><tbody>{rows.map(r=><tr key={r.id}><td><span className={new Date(r.end_at)>new Date()?'pill active':'pill'}>{new Date(r.end_at)>new Date()?'Active':'Expired'}</span></td><td><b>{r.plate}</b></td><td>{r.stall_number}</td><td>{r.phone}</td><td>{new Date(r.start_at).toLocaleString()}</td><td>{new Date(r.end_at).toLocaleString()}</td><td>{r.confirmation_code}</td></tr>)}</tbody></table></div></section></main>}
-async function start(){
- const r=await fetch(API+'/api/public/config');const c=await r.json().catch(()=>({}));if(!r.ok)throw new Error(c.error||'Unable to load application configuration.');
- supabase=createClient(c.supabase_url,c.supabase_anon_key);
- createRoot(document.getElementById('root')).render(location.pathname.startsWith('/admin')?<Admin/>:<Register/>);
+const cleanPlate = (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, "");
+async function api(path, options = {}) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const r = await fetch(API + path, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      ...options.headers,
+    },
+  });
+  const b = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(b.error || "Request failed");
+  return b;
 }
-start().catch(e=>createRoot(document.getElementById('root')).render(<main className="shell narrow"><section className="hero"><span className="eyebrow">CONFIGURATION ERROR</span><h1>Unable to start</h1><p>{e.message}</p></section></main>));
+
+function Register() {
+  const [settings, setSettings] = useState(null),
+    [form, setForm] = useState({
+      plate: "",
+      phone: "",
+      stall: "",
+      start_at: "",
+      duration_hours: "",
+    }),
+    [msg, setMsg] = useState(""),
+    [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api("/api/public/settings")
+      .then(setSettings)
+      .catch((e) => setMsg(e.message));
+  }, []);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await api("/api/register", {
+        method: "POST",
+        body: JSON.stringify({
+          ...form,
+          plate: cleanPlate(form.plate),
+          duration_hours: Number(form.duration_hours),
+        }),
+      });
+      setMsg(`Registration successful. Confirmation #${r.confirmation_code}`);
+      setForm({
+        plate: "",
+        phone: "",
+        stall: "",
+        start_at: "",
+        duration_hours: "",
+      });
+    } catch (e) {
+      setMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="shell">
+      <section className="hero">
+        <span className="eyebrow">BAYDO POINTE</span>
+        <h1>Visitor Parking</h1>
+        <p>
+          Register your vehicle before parking. A confirmation and expiry
+          reminder will be sent by text.
+        </p>
+      </section>
+      <form className="card" onSubmit={submit}>
+        <label>
+          Licence plate
+          <input
+            required
+            maxLength="12"
+            placeholder="ABC 123"
+            value={form.plate}
+            onChange={(e) => setForm({ ...form, plate: e.target.value })}
+          />
+        </label>
+        <label>
+          Mobile phone
+          <input
+            required
+            type="tel"
+            placeholder="+1 780 555 0123"
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          />
+        </label>
+        <label>
+          Visitor parking stall
+          <select
+            required
+            value={form.stall}
+            onChange={(e) => setForm({ ...form, stall: e.target.value })}
+          >
+            <option value="">Select a stall</option>
+            {settings?.stalls?.map((s) => (
+              <option key={s} value={s}>
+                Visitor {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="row">
+          <label>
+            Start time
+            <input
+              required
+              type="datetime-local"
+              value={form.start_at}
+              onChange={(e) => setForm({ ...form, start_at: e.target.value })}
+            />
+          </label>
+          <label>
+            Parking duration
+            <select
+              required
+              value={form.duration_hours}
+              onChange={(e) => setForm({ ...form, duration_hours: e.target.value })}
+            >
+              <option value="">Select duration</option>
+              {settings?.duration_options?.map((h) => <option key={h} value={h}>{h} hours</option>)}
+            </select>
+          </label>
+        </div>
+        <label className="agree">
+          <input required type="checkbox" /> I confirm the information is
+          correct and consent to parking-related text messages.
+        </label>
+        <button disabled={busy}>
+          {busy ? "Registering…" : "Register vehicle"}
+        </button>
+        {msg && <div className="message">{msg}</div>}
+        <small>
+          Maximum stay and usage limits apply. Vehicles may be towed if
+          registration details are invalid or expired.
+        </small>
+      </form>
+      <a className="admin-link" href="/admin">
+        Staff login
+      </a>
+    </main>
+  );
+}
+
+function PasswordChange({ onComplete }) {
+  const [password, setPassword] = useState(""),
+    [confirm, setConfirm] = useState(""),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (password.length < 10) return setError("Use at least 10 characters.");
+    if (password !== confirm) return setError("Passwords do not match.");
+    setBusy(true);
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({
+        password,
+      });
+      if (updateError) throw updateError;
+      await api("/api/admin/password-changed", { method: "POST" });
+      await onComplete();
+    } catch (x) {
+      setError(x.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <main className="shell narrow">
+      <section className="hero">
+        <span className="eyebrow">SECURITY UPDATE</span>
+        <h1>Change password</h1>
+        <p>
+          Your staff password must be changed every 180 days before you can
+          access the dashboard.
+        </p>
+      </section>
+      <form className="card" onSubmit={submit}>
+        <label>
+          New password
+          <input
+            required
+            minLength="10"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        <label>
+          Confirm new password
+          <input
+            required
+            minLength="10"
+            type="password"
+            autoComplete="new-password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+        </label>
+        <button disabled={busy}>
+          {busy ? "Updating…" : "Change password"}
+        </button>
+        {error && <div className="message error">{error}</div>}
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => supabase.auth.signOut()}
+        >
+          Sign out
+        </button>
+      </form>
+    </main>
+  );
+}
+
+function Admin() {
+  const [session, setSession] = useState(null),
+    [checked, setChecked] = useState(true),
+    [mustChange, setMustChange] = useState(false),
+    [email, setEmail] = useState(""),
+    [password, setPassword] = useState(""),
+    [rows, setRows] = useState([]),
+    [settings, setSettings] = useState(null),
+    [error, setError] = useState("");
+  useEffect(() => {
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        setSession(data.session);
+        setChecked(!data.session);
+      })
+      .catch((e) => {
+        setError(e.message);
+        setChecked(true);
+      });
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_, s) => {
+      setSession(s);
+      setChecked(!s);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+  const checkSession = async () => {
+    if (!session) {
+      setChecked(true);
+      return;
+    }
+    try {
+      const result = await api("/api/admin/session");
+      setMustChange(result.password_change_required);
+      setError("");
+    } catch (e) {
+      setError(e.message);
+      await supabase.auth.signOut();
+    } finally {
+      setChecked(true);
+    }
+  };
+  const load = async () => {
+    try {
+      const [r, s] = await Promise.all([
+        api("/api/admin/registrations"),
+        api("/api/admin/settings"),
+      ]);
+      setRows(r.registrations);
+      setSettings(s);
+      setError("");
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+  useEffect(() => {
+    checkSession();
+  }, [session]);
+  useEffect(() => {
+    if (session && checked && !mustChange) load();
+  }, [session, checked, mustChange]);
+  if (!checked)
+    return (
+      <main className="shell narrow">
+        <section className="hero">
+          <span className="eyebrow">STAFF PORTAL</span>
+          <h1>Checking access…</h1>
+        </section>
+      </main>
+    );
+  if (!session)
+    return (
+      <main className="shell narrow">
+        <section className="hero">
+          <span className="eyebrow">STAFF PORTAL</span>
+          <h1>Parking Admin</h1>
+          <p>Authorized staff only.</p>
+        </section>
+        <form
+          className="card"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setError("");
+            const { error: loginError } =
+              await supabase.auth.signInWithPassword({ email, password });
+            if (loginError) setError(loginError.message);
+          }}
+        >
+          <label>
+            Email
+            <input
+              required
+              autoComplete="username"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <label>
+            Password
+            <input
+              required
+              autoComplete="current-password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+          <button>Sign in</button>
+          {error && <div className="message error">{error}</div>}
+        </form>
+      </main>
+    );
+  if (mustChange)
+    return (
+      <PasswordChange
+        onComplete={async () => {
+          setMustChange(false);
+          await load();
+        }}
+      />
+    );
+  const save = async (e) => {
+    e.preventDefault();
+    try {
+      await api("/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify(settings),
+      });
+      await load();
+    } catch (x) {
+      setError(x.message);
+    }
+  };
+  return (
+    <main className="dashboard">
+      <header>
+        <div>
+          <span className="eyebrow">BAYDO POINTE</span>
+          <h1>Visitor Parking</h1>
+        </div>
+        <div>
+          <button
+            className="secondary"
+            onClick={() =>
+              (location.href =
+                API + "/api/admin/export?token=" + session.access_token)
+            }
+          >
+            Download CSV
+          </button>{" "}
+          <button className="secondary" onClick={() => supabase.auth.signOut()}>
+            Sign out
+          </button>
+        </div>
+      </header>
+      <section className="stats">
+        <div>
+          <b>{rows.filter((x) => new Date(x.end_at) > new Date()).length}</b>
+          <span>Active vehicles</span>
+        </div>
+        <div>
+          <b>{settings?.stall_count || 0}</b>
+          <span>Visitor stalls</span>
+        </div>
+        <div>
+          <b>{rows.length}</b>
+          <span>Records shown</span>
+        </div>
+      </section>
+      {settings && (
+        <form className="settings" onSubmit={save}>
+          <h2>Parking rules</h2>
+          <label>
+            Number of stalls
+            <input
+              type="number"
+              min="1"
+              value={settings.stall_count}
+              onChange={(e) =>
+                setSettings({ ...settings, stall_count: +e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Available duration options (hours)
+            <input
+              value={(settings.duration_options || []).join(", ")}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  duration_options: e.target.value
+                    .split(",")
+                    .map((v) => Number(v.trim()))
+                    .filter(Boolean),
+                })
+              }
+            />
+            <small>Example: 2, 4, 8, 24</small>
+          </label>
+          <label>
+            Maximum stay (hours)
+            <input
+              type="number"
+              min="1"
+              value={settings.max_stay_hours}
+              onChange={(e) =>
+                setSettings({ ...settings, max_stay_hours: +e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Rolling period (days)
+            <input
+              type="number"
+              min="1"
+              value={settings.rolling_days}
+              onChange={(e) =>
+                setSettings({ ...settings, rolling_days: +e.target.value })
+              }
+            />
+          </label>
+          <label>
+            Maximum parked days
+            <input
+              type="number"
+              min="1"
+              value={settings.max_days_in_period}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  max_days_in_period: +e.target.value,
+                })
+              }
+            />
+          </label>
+          <button>Save rules</button>
+        </form>
+      )}
+      <section className="table-card">
+        <h2>Registration list</h2>
+        {error && <div className="message error">{error}</div>}
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Plate</th>
+                <th>Stall</th>
+                <th>Phone</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Code</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <span
+                      className={
+                        new Date(r.end_at) > new Date() ? "pill active" : "pill"
+                      }
+                    >
+                      {new Date(r.end_at) > new Date() ? "Active" : "Expired"}
+                    </span>
+                  </td>
+                  <td>
+                    <b>{r.plate}</b>
+                  </td>
+                  <td>{r.stall_number}</td>
+                  <td>{r.phone}</td>
+                  <td>{new Date(r.start_at).toLocaleString()}</td>
+                  <td>{new Date(r.end_at).toLocaleString()}</td>
+                  <td>{r.confirmation_code}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  );
+}
+async function start() {
+  const r = await fetch(API + "/api/public/config");
+  const c = await r.json().catch(() => ({}));
+  if (!r.ok)
+    throw new Error(c.error || "Unable to load application configuration.");
+  supabase = createClient(c.supabase_url, c.supabase_anon_key);
+  createRoot(document.getElementById("root")).render(
+    location.pathname.startsWith("/admin") ? <Admin /> : <Register />,
+  );
+}
+start().catch((e) =>
+  createRoot(document.getElementById("root")).render(
+    <main className="shell narrow">
+      <section className="hero">
+        <span className="eyebrow">CONFIGURATION ERROR</span>
+        <h1>Unable to start</h1>
+        <p>{e.message}</p>
+      </section>
+    </main>,
+  ),
+);
