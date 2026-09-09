@@ -231,6 +231,8 @@ function Admin() {
   const [session, setSession] = useState(null),
     [checked, setChecked] = useState(true),
     [mustChange, setMustChange] = useState(false),
+    [recovery, setRecovery] = useState(false),
+    [forgot, setForgot] = useState(false),
     [email, setEmail] = useState(""),
     [password, setPassword] = useState(""),
     [rows, setRows] = useState([]),
@@ -249,8 +251,9 @@ function Admin() {
       });
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_, s) => {
+    } = supabase.auth.onAuthStateChange((event, s) => {
       setSession(s);
+      if (event === "PASSWORD_RECOVERY") setRecovery(true);
       setChecked(!s);
     });
     return () => subscription.unsubscribe();
@@ -299,6 +302,18 @@ function Admin() {
         </section>
       </main>
     );
+  if (forgot && !session)
+    return (
+      <main className="shell narrow">
+        <section className="hero"><span className="eyebrow">STAFF PORTAL</span><h1>Reset password</h1><p>Enter your staff email and we’ll send a reset link.</p></section>
+        <form className="card" onSubmit={async (e) => { e.preventDefault(); setError(""); const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/admin` }); if (resetError) setError(resetError.message); else setError("Reset email sent. Check your inbox."); }}>
+          <label>Email<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+          <button>Send reset email</button>
+          <button type="button" className="text-button" onClick={() => setForgot(false)}>Back to sign in</button>
+          {error && <div className="message">{error}</div>}
+        </form>
+      </main>
+    );
   if (!session)
     return (
       <main className="shell narrow">
@@ -338,10 +353,13 @@ function Admin() {
             />
           </label>
           <button>Sign in</button>
+          <button type="button" className="text-button" onClick={() => setForgot(true)}>Forgot password?</button>
           {error && <div className="message error">{error}</div>}
         </form>
       </main>
     );
+  if (recovery)
+    return <PasswordChange onComplete={async () => { setRecovery(false); await load(); }} />;
   if (mustChange)
     return (
       <PasswordChange
