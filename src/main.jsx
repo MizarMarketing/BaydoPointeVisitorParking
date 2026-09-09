@@ -32,7 +32,7 @@ function Register() {
   const [settings, setSettings] = useState(null),
     [form, setForm] = useState({
       plate: "",
-      phone: "",
+      email: "",
       stall: "",
       start_at: localNow(),
       duration_hours: "",
@@ -61,7 +61,7 @@ function Register() {
       setMsg(`Registration successful. Confirmation #${r.confirmation_code}`);
       setForm({
         plate: "",
-        phone: "",
+        email: "",
         stall: "",
         start_at: localNow(),
         duration_hours: "",
@@ -94,13 +94,13 @@ function Register() {
           />
         </label>
         <label>
-          Mobile phone
+          Email address
           <input
             required
-            type="tel"
-            placeholder="+1 780 555 0123"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            type="email"
+            placeholder="you@example.com"
+            value={form.email}
+            onChange={(e) => setForm({ ...form, email: e.target.value })}
           />
         </label>
         <label>
@@ -525,7 +525,7 @@ function Admin() {
                     <b>{r.plate}</b>
                   </td>
                   <td>{r.stall_number}</td>
-                  <td>{r.phone}</td>
+                  <td>{r.email}</td>
                   <td>{new Date(r.start_at).toLocaleString()}</td>
                   <td>{new Date(r.end_at).toLocaleString()}</td>
                   <td>{r.confirmation_code}</td>
