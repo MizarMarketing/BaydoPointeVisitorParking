@@ -71,12 +71,26 @@ async function admin(env, request, url, { allowExpired = false } = {}) {
 async function sendEmail(env, to, subject, html) {
   const functionUrl = env.SUPABASE_EMAIL_FUNCTION_URL;
   if (!functionUrl) throw new Error("Email is not configured.");
-  const r = await fetch(functionUrl, {
+  const target = new URL(functionUrl);
+  if (target.origin !== new URL(env.SUPABASE_URL).origin ||
+      target.pathname !== "/functions/v1/send-parking-email" ||
+      target.protocol !== "https:") throw new Error("Invalid email function URL.");
+  const token = env.SUPABASE_EMAIL_SERVICE_JWT || env.SUPABASE_SERVICE_ROLE_KEY;
+  let claims;
+  try { claims = JSON.parse(atob(String(token).split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); }
+  catch { throw new Error("Set SUPABASE_EMAIL_SERVICE_JWT to the legacy service_role JWT in Worker Secrets."); }
+  if (claims.role !== "service_role") throw new Error("Email requires a service_role JWT.");
+  const r = await fetch(target, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    redirect: "error",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+      apikey: token,
+    },
     body: JSON.stringify({ to, subject, html }),
   });
-  if (!r.ok) throw new Error("Email delivery failed.");
+  if (!r.ok) throw new Error(`Email delivery failed (HTTP ${r.status}).`);
 }
 async function settings(env) {
   const r = await sb(env, "parking_settings?id=eq.1&select=*");
