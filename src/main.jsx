@@ -6,6 +6,11 @@ import "./style.css";
 const API = import.meta.env.VITE_API_URL || "";
 let supabase;
 const cleanPlate = (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, "");
+const UNITS_BY_BUILDING = {
+  "370 Clareview Station Dr NW": [...Array.from({ length: 18 }, (_, i) => String(101 + i)), ...[2,3,4,5,6].flatMap(f => Array.from({ length: 20 }, (_, i) => String(f * 100 + 1 + i)))],
+  "374 Clareview Station Dr NW": [...Array.from({ length: 14 }, (_, i) => String(101 + i)), ...[2,3,4,5,6].flatMap(f => Array.from({ length: 16 }, (_, i) => String(f * 100 + 1 + i)))],
+  "378 Clareview Station Dr NW": [...Array.from({ length: 18 }, (_, i) => String(101 + i)), ...[2,3,4,5,6].flatMap(f => Array.from({ length: 20 }, (_, i) => String(f * 100 + 1 + i)))],
+};
 const edmontonTime = (value) => new Date(value).toLocaleString("en-CA", {
   timeZone: "America/Edmonton", timeZoneName: "short",
 });
@@ -104,7 +109,7 @@ function Register() {
         </label>
         <div className="row">
           <label>Building<select required value={form.building} onChange={(e) => setForm({ ...form, building: e.target.value })}><option value="">Select building</option><option value="370 Clareview Station Dr NW">370 Clareview Station Dr NW</option><option value="374 Clareview Station Dr NW">374 Clareview Station Dr NW</option><option value="378 Clareview Station Dr NW">378 Clareview Station Dr NW</option></select></label>
-          <label>Unit number<input required value={form.unit_number} placeholder="e.g. 1204" onChange={(e) => setForm({ ...form, unit_number: e.target.value })} /></label>
+          <label>Unit number<select required value={form.unit_number} disabled={!form.building} onChange={(e) => setForm({ ...form, unit_number: e.target.value })}><option value="">{form.building ? "Select unit" : "Select building first"}</option>{(UNITS_BY_BUILDING[form.building] || []).map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select></label>
         </div>
         <label>
           Email address
@@ -601,3 +606,4 @@ start().catch((e) =>
     </main>,
   ),
 );
+
