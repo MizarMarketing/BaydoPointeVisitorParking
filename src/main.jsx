@@ -65,7 +65,7 @@ function Register() {
           duration_hours: Number(form.duration_hours),
         }),
       });
-      setMsg(`Registration successful. Confirmation #${r.confirmation_code}`);
+      setMsg("Registration successful. Please check your confirmation email.");
       setForm({
         plate: "",
         email: "",
