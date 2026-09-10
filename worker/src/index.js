@@ -135,6 +135,13 @@ async function register(env, request) {
     throw new Error(
       `A registration can be no longer than ${cfg.max_stay_hours} hours.`,
     );
+  // A plate cannot hold overlapping registrations, even in different stalls.
+  const existingPlate = await sb(
+    env,
+    `parking_registrations?plate=eq.${encodeURIComponent(plate)}&status=eq.active&start_at=lt.${encodeURIComponent(end.toISOString())}&end_at=gt.${encodeURIComponent(start.toISOString())}&select=id&limit=1`,
+  );
+  if (existingPlate.length)
+    throw new Error("This licence plate already has an active registration. Use Extend parking time to add hours.");
   // Stall numbers identify locations; prior registrations do not reserve them.
   const since = new Date(
     start.getTime() - cfg.rolling_days * 864e5,
@@ -233,7 +240,7 @@ async function extendParking(env, request) {
   const updated = await sb(env, `parking_registrations?id=eq.${r.id}&end_at=eq.${encodeURIComponent(r.end_at)}&status=eq.active`, {method:"PATCH",body:{end_at:new Date(end).toISOString(),reminder_sent_at:null}});
   if (!updated?.length) throw new Error("Registration changed. Please refresh before trying again.");
   let email_sent = true;
-  try { await sendEmail(env,address,"Parking time extended",`Your parking has been extended. New expiry: ${new Date(end).toISOString()}. Confirmation: ${code}`); }
+  try { await sendEmail(env,address,"Parking time extended",`Your parking has been extended. New expiry: ${new Date(end).toLocaleString("en-CA", { timeZone: "America/Edmonton", timeZoneName: "short" })}. Confirmation: ${code}`); }
   catch { email_sent = false; }
   return {end_at:new Date(end).toISOString(),email_sent};
 }
