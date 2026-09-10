@@ -135,14 +135,7 @@ async function register(env, request) {
     throw new Error(
       `A registration can be no longer than ${cfg.max_stay_hours} hours.`,
     );
-  const overlap = await sb(
-    env,
-    `parking_registrations?stall_number=eq.${stall}&status=eq.active&start_at=lt.${encodeURIComponent(end.toISOString())}&end_at=gt.${encodeURIComponent(start.toISOString())}&select=id`,
-  );
-  if (overlap.length)
-    throw new Error(
-      "That stall is already registered during the selected time.",
-    );
+  // Stall numbers identify locations; prior registrations do not reserve them.
   const since = new Date(
     start.getTime() - cfg.rolling_days * 864e5,
   ).toISOString();
@@ -228,8 +221,6 @@ async function extendParking(env, request) {
   if (!Number.isFinite(hours) || hours <= 0 || !(cfg.duration_options || [2,4,8,24]).map(Number).includes(hours)) throw new Error("Select an available duration.");
   const end = oldEnd + hours * 36e5;
   if (end - start > cfg.max_stay_hours * 36e5) throw new Error("Total parking time exceeds Maximum stay.");
-  const overlap = await sb(env, `parking_registrations?id=neq.${r.id}&stall_number=eq.${r.stall_number}&status=eq.active&start_at=lt.${encodeURIComponent(new Date(end).toISOString())}&end_at=gt.${encodeURIComponent(r.end_at)}&select=id`);
-  if (overlap.length) throw new Error("This stall is reserved during the extended time.");
   const windowMs = cfg.rolling_days * 864e5;
   const history = await sb(env, `parking_registrations?plate=eq.${encodeURIComponent(plate)}&status=neq.cancelled&end_at=gt.${encodeURIComponent(new Date(start-windowMs).toISOString())}&select=id,start_at,end_at`);
   const intervals = history.filter(v => v.id !== r.id).map(v => [Date.parse(v.start_at),Date.parse(v.end_at)]);
