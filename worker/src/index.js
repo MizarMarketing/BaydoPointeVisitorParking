@@ -82,7 +82,7 @@ async function sendEmail(env, to, subject, html) {
   if (claims.role !== "service_role") throw new Error("Email requires a service_role JWT.");
   const r = await fetch(target, {
     method: "POST",
-    redirect: "error",
+    redirect: "manual",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
