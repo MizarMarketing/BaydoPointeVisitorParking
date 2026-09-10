@@ -6,10 +6,15 @@ import "./style.css";
 const API = import.meta.env.VITE_API_URL || "";
 let supabase;
 const cleanPlate = (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, "");
+const edmontonTime = (value) => new Date(value).toLocaleString("en-CA", {
+  timeZone: "America/Edmonton", timeZoneName: "short",
+});
 const localNow = () => {
-  const d = new Date();
-  const pad = (v) => String(v).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Edmonton", year: "numeric", month: "2-digit",
+    day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date()).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 };
 async function api(path, options = {}) {
   const {
@@ -128,7 +133,7 @@ function Register() {
         </label>
         <div className="row">
           <label>
-            Start time
+            Start time (Edmonton)
             <input
               required
               type="datetime-local"
@@ -181,7 +186,7 @@ function ExtendParking({ options }) {
     setBusy(true); setMessage("");
     try {
       const result = await api("/api/extend", { method: "POST", body: JSON.stringify(form) });
-      setMessage(`Parking extended. New expiry: ${new Date(result.end_at).toLocaleString()}.${result.email_sent ? " Confirmation email sent." : " Email could not be sent; your extension is saved."}`);
+      setMessage(`Parking extended. New expiry: ${edmontonTime(result.end_at)}.${result.email_sent ? " Confirmation email sent." : " Email could not be sent; your extension is saved."}`);
       setForm({ ...form, hours: "" });
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
@@ -541,8 +546,8 @@ function Admin() {
                 <th>Plate</th>
                 <th>Stall</th>
                 <th>Phone</th>
-                <th>Start</th>
-                <th>End</th>
+                <th>Start (Edmonton)</th>
+                <th>End (Edmonton)</th>
                 <th>Code</th>
               </tr>
             </thead>
@@ -563,8 +568,8 @@ function Admin() {
                   </td>
                   <td>{r.stall_number}</td>
                   <td>{r.email}</td>
-                  <td>{new Date(r.start_at).toLocaleString()}</td>
-                  <td>{new Date(r.end_at).toLocaleString()}</td>
+                  <td>{edmontonTime(r.start_at)}</td>
+                  <td>{edmontonTime(r.end_at)}</td>
                   <td>{r.confirmation_code}</td>
                 </tr>
               ))}
