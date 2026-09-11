@@ -291,7 +291,12 @@ function Admin() {
     [password, setPassword] = useState(""),
     [rows, setRows] = useState([]),
     [settings, setSettings] = useState(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [view, setView] = useState("today"),
+    [fromDate, setFromDate] = useState(""),
+    [toDate, setToDate] = useState(""),
+    [page, setPage] = useState(1);
+  const pageSize = 25;
   useEffect(() => {
     supabase.auth
       .getSession()
@@ -347,6 +352,40 @@ function Admin() {
   useEffect(() => {
     if (session && checked && !mustChange) load();
   }, [session, checked, mustChange]);
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Edmonton",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  const rowDate = (value) => new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Edmonton",
+    year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date(value));
+  const filteredRows = rows.filter((r) => {
+    const date = rowDate(r.start_at);
+    if (view === "today") return date === today;
+    if (fromDate && date < fromDate) return false;
+    if (toDate && date > toDate) return false;
+    return true;
+  });
+  const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const downloadCsv = async () => {
+    try {
+      const response = await fetch(API + "/api/admin/export", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!response.ok) throw new Error("Unable to download registration history.");
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "visitor-parking-records.csv";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
   if (!checked)
     return (
       <main className="shell narrow">
@@ -360,7 +399,7 @@ function Admin() {
     return (
       <main className="shell narrow">
         <section className="hero"><span className="eyebrow">STAFF PORTAL</span><h1>Reset password</h1><p>Enter your staff email and we’ll send a reset link.</p></section>
-        <form className="card" onSubmit={async (e) => { e.preventDefault(); setError(""); const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/admin` }); if (resetError) setError(resetError.message); else setError("Reset email sent. Check your inbox."); }}>
+        <form className="card" onSubmit={async (e) => { e.preventDefault(); setError(""); const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: \`\${location.origin}/admin\` }); if (resetError) setError(resetError.message); else setError("Reset email sent. Check your inbox."); }}>
           <label>Email<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
           <button>Send reset email</button>
           <button type="button" className="text-button" onClick={() => setForgot(false)}>Back to sign in</button>
@@ -376,36 +415,14 @@ function Admin() {
           <h1>Parking Admin</h1>
           <p>Authorized staff only.</p>
         </section>
-        <form
-          className="card"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            const { error: loginError } =
-              await supabase.auth.signInWithPassword({ email, password });
-            if (loginError) setError(loginError.message);
-          }}
-        >
-          <label>
-            Email
-            <input
-              required
-              autoComplete="username"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
-          <label>
-            Password
-            <input
-              required
-              autoComplete="current-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </label>
+        <form className="card" onSubmit={async (e) => {
+          e.preventDefault();
+          setError("");
+          const { error: loginError } = await supabase.auth.signInWithPassword({ email, password });
+          if (loginError) setError(loginError.message);
+        }}>
+          <label>Email<input required autoComplete="username" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+          <label>Password<input required autoComplete="current-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
           <button>Sign in</button>
           <button type="button" className="text-button" onClick={() => setForgot(true)}>Forgot password?</button>
           {error && <div className="message error">{error}</div>}
@@ -415,21 +432,11 @@ function Admin() {
   if (recovery)
     return <PasswordChange onComplete={async () => { setRecovery(false); await load(); }} />;
   if (mustChange)
-    return (
-      <PasswordChange
-        onComplete={async () => {
-          setMustChange(false);
-          await load();
-        }}
-      />
-    );
+    return <PasswordChange onComplete={async () => { setMustChange(false); await load(); }} />;
   const save = async (e) => {
     e.preventDefault();
     try {
-      await api("/api/admin/settings", {
-        method: "PUT",
-        body: JSON.stringify(settings),
-      });
+      await api("/api/admin/settings", { method: "PUT", body: JSON.stringify(settings) });
       await load();
     } catch (x) {
       setError(x.message);
@@ -438,148 +445,55 @@ function Admin() {
   return (
     <main className="dashboard">
       <header>
+        <div><span className="eyebrow">BAYDO POINTE</span><h1>Visitor Parking</h1></div>
         <div>
-          <span className="eyebrow">BAYDO POINTE</span>
-          <h1>Visitor Parking</h1>
-        </div>
-        <div>
-          <button
-            className="secondary"
-            onClick={() =>
-              (location.href =
-                API + "/api/admin/export?token=" + session.access_token)
-            }
-          >
-            Download CSV
-          </button>{" "}
-          <button className="secondary" onClick={() => supabase.auth.signOut()}>
-            Sign out
-          </button>
+          <button className="secondary" onClick={downloadCsv}>Download CSV</button>{" "}
+          <button className="secondary" onClick={() => supabase.auth.signOut()}>Sign out</button>
         </div>
       </header>
       <section className="stats">
-        <div>
-          <b>{rows.filter((x) => new Date(x.end_at) > new Date()).length}</b>
-          <span>Active vehicles</span>
-        </div>
-        <div>
-          <b>{settings?.stall_count || 0}</b>
-          <span>Visitor stalls</span>
-        </div>
-        <div>
-          <b>{rows.length}</b>
-          <span>Records shown</span>
-        </div>
+        <div><b>{rows.filter((x) => new Date(x.end_at) > new Date()).length}</b><span>Active vehicles</span></div>
+        <div><b>{settings?.stall_count || 0}</b><span>Visitor stalls</span></div>
+        <div><b>{filteredRows.length}</b><span>{view === "today" ? "Today's records" : "History records"}</span></div>
       </section>
       {settings && (
         <form className="settings" onSubmit={save}>
           <h2>Parking rules</h2>
-          <label>
-            Number of stalls
-            <input
-              type="number"
-              min="1"
-              value={settings.stall_count}
-              onChange={(e) =>
-                setSettings({ ...settings, stall_count: +e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Available duration options (hours)
-            <input
-              value={(settings.duration_options || []).join(", ")}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  duration_options: e.target.value
-                    .split(",")
-                    .map((v) => Number(v.trim()))
-                    .filter(Boolean),
-                })
-              }
-            />
-            <small>Example: 2, 4, 8, 24</small>
-          </label>
-          <label>
-            Maximum stay (hours)
-            <input
-              type="number"
-              min="1"
-              value={settings.max_stay_hours}
-              onChange={(e) =>
-                setSettings({ ...settings, max_stay_hours: +e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Rolling period (days)
-            <input
-              type="number"
-              min="1"
-              value={settings.rolling_days}
-              onChange={(e) =>
-                setSettings({ ...settings, rolling_days: +e.target.value })
-              }
-            />
-          </label>
-          <label>
-            Maximum parked days
-            <input
-              type="number"
-              min="1"
-              value={settings.max_days_in_period}
-              onChange={(e) =>
-                setSettings({
-                  ...settings,
-                  max_days_in_period: +e.target.value,
-                })
-              }
-            />
-          </label>
+          <label>Number of stalls<input type="number" min="1" value={settings.stall_count} onChange={(e) => setSettings({ ...settings, stall_count: +e.target.value })} /></label>
+          <label>Available duration options (hours)<input value={(settings.duration_options || []).join(", ")} onChange={(e) => setSettings({ ...settings, duration_options: e.target.value.split(",").map((v) => Number(v.trim())).filter(Boolean) })} /><small>Example: 2, 4, 8, 24</small></label>
+          <label>Maximum stay (hours)<input type="number" min="1" value={settings.max_stay_hours} onChange={(e) => setSettings({ ...settings, max_stay_hours: +e.target.value })} /></label>
+          <label>Rolling period (days)<input type="number" min="1" value={settings.rolling_days} onChange={(e) => setSettings({ ...settings, rolling_days: +e.target.value })} /></label>
+          <label>Maximum parked days<input type="number" min="1" value={settings.max_days_in_period} onChange={(e) => setSettings({ ...settings, max_days_in_period: +e.target.value })} /></label>
           <button>Save rules</button>
         </form>
       )}
       <section className="table-card">
+        <div className="table-toolbar">
+          <div>
+            <button type="button" className={view === "today" ? "" : "secondary"} onClick={() => { setView("today"); setPage(1); }}>Today</button>{" "}
+            <button type="button" className={view === "history" ? "" : "secondary"} onClick={() => { setView("history"); setPage(1); }}>History</button>
+          </div>
+          {view === "history" && <div className="date-filters"><label>From <input type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} /></label><label>To <input type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} /></label><button type="button" className="text-button" onClick={() => { setFromDate(""); setToDate(""); setPage(1); }}>Clear</button></div>}
+        </div>
         <h2>Registration list</h2>
         {error && <div className="message error">{error}</div>}
         <div className="table-wrap">
           <table>
-            <thead>
-              <tr>
-                <th>Status</th>
-                <th>Plate</th>
-                <th>Stall</th>
-                <th>Phone</th>
-                <th>Start (Edmonton)</th>
-                <th>End (Edmonton)</th>
-                <th>Code</th>
-              </tr>
-            </thead>
+            <thead><tr><th>Status</th><th>Plate</th><th>Stall</th><th>Building</th><th>Unit</th><th>Email</th><th>Start (Edmonton)</th><th>End (Edmonton)</th><th>Code</th></tr></thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <span
-                      className={
-                        new Date(r.end_at) > new Date() ? "pill active" : "pill"
-                      }
-                    >
-                      {new Date(r.end_at) > new Date() ? "Active" : "Expired"}
-                    </span>
-                  </td>
-                  <td>
-                    <b>{r.plate}</b>
-                  </td>
-                  <td>{r.stall_number}</td>
-                  <td>{r.email}</td>
-                  <td>{edmontonTime(r.start_at)}</td>
-                  <td>{edmontonTime(r.end_at)}</td>
-                  <td>{r.confirmation_code}</td>
-                </tr>
-              ))}
+              {pageRows.map((r) => <tr key={r.id}>
+                <td><span className={new Date(r.end_at) > new Date() ? "pill active" : "pill"}>{new Date(r.end_at) > new Date() ? "Active" : "Expired"}</span></td>
+                <td><b>{r.plate}</b></td><td>{r.stall_number}</td><td>{r.building}</td><td>{r.unit_number}</td><td>{r.email}</td>
+                <td>{edmontonTime(r.start_at)}</td><td>{edmontonTime(r.end_at)}</td><td>{r.confirmation_code}</td>
+              </tr>)}
             </tbody>
           </table>
+          {!pageRows.length && <p>No registrations found for this view.</p>}
+        </div>
+        <div className="pagination">
+          <button type="button" className="secondary" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>Previous</button>
+          <span>Page {safePage} of {pageCount} ({filteredRows.length} records)</span>
+          <button type="button" className="secondary" disabled={safePage >= pageCount} onClick={() => setPage(safePage + 1)}>Next</button>
         </div>
       </section>
     </main>
