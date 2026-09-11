@@ -50,7 +50,8 @@ function Register() {
       duration_hours: "",
     }),
     [msg, setMsg] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [mode, setMode] = useState("register");
   useEffect(() => {
     api("/api/public/settings")
       .then(setSettings)
@@ -96,6 +97,11 @@ function Register() {
           reminder will be sent by text.
         </p>
       </section>
+      <div className="mode-tabs" role="tablist" aria-label="Parking actions">
+        <button type="button" className={mode === "register" ? "" : "secondary"} onClick={() => setMode("register")}>Register vehicle</button>
+        <button type="button" className={mode === "extend" ? "" : "secondary"} onClick={() => setMode("extend")}>Extend parking time</button>
+      </div>
+      {mode === "register" && (
       <form className="card" onSubmit={submit}>
         <label>
           Licence plate
@@ -173,7 +179,8 @@ function Register() {
           registration details are invalid or expired.
         </small>
       </form>
-      <ExtendParking options={settings?.duration_options || []} />
+      )}
+      {mode === "extend" && <ExtendParking options={settings?.duration_options || []} />}
       <a className="admin-link" href="/admin">
         Staff login
       </a>
@@ -196,7 +203,7 @@ function ExtendParking({ options }) {
     } catch (error) { setMessage(error.message); }
     finally { setBusy(false); }
   };
-  return <details className="card"><summary>Extend parking time</summary>
+  return <section className="card"><h2>Extend parking time</h2>
     <p>Additional hours are added to your current expiry. Total stay and rolling-period limits still apply.</p>
     <form onSubmit={submit}>
       <label>Email<input required type="email" value={form.email} onChange={e => setForm({...form,email:e.target.value})}/></label>
@@ -205,7 +212,7 @@ function ExtendParking({ options }) {
       <label>Additional hours<select required value={form.hours} onChange={e => setForm({...form,hours:e.target.value})}><option value="">Select duration</option>{options.map(h => <option key={h} value={h}>{h} hours</option>)}</select></label>
       <button disabled={busy}>{busy ? "Extending…" : "Extend parking"}</button>
       {message && <p role="status">{message}</p>}
-    </form></details>;
+    </form></section>;
 }
 
 function PasswordChange({ onComplete }) {
