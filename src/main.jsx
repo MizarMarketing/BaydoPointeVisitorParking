@@ -370,21 +370,18 @@ function Admin() {
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
   const safePage = Math.min(page, pageCount);
   const pageRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const downloadCsv = async () => {
-    try {
-      const response = await fetch(API + "/api/admin/export", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (!response.ok) throw new Error("Unable to download registration history.");
-      const blob = await response.blob();
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "visitor-parking-records.csv";
-      link.click();
-      URL.revokeObjectURL(link.href);
-    } catch (e) {
-      setError(e.message);
-    }
+  const downloadCsv = () => {
+    const columns = ["status", "plate", "stall_number", "building", "unit_number", "email", "start_at", "end_at", "confirmation_code"];
+    const cell = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const csv = [
+      columns.join(","),
+      ...filteredRows.map((row) => columns.map((column) => cell(column === "status" ? (new Date(row.end_at) > new Date() ? "Active" : "Expired") : row[column])).join(",")),
+    ].join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    link.download = view === "today" ? "visitor-parking-today.csv" : "visitor-parking-history.csv";
+    link.click();
+    URL.revokeObjectURL(link.href);
   };
   if (!checked)
     return (
