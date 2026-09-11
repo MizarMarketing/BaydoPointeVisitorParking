@@ -396,7 +396,7 @@ function Admin() {
     return (
       <main className="shell narrow">
         <section className="hero"><span className="eyebrow">STAFF PORTAL</span><h1>Reset password</h1><p>Enter your staff email and we’ll send a reset link.</p></section>
-        <form className="card" onSubmit={async (e) => { e.preventDefault(); setError(""); const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: \`\${location.origin}/admin\` }); if (resetError) setError(resetError.message); else setError("Reset email sent. Check your inbox."); }}>
+        <form className="card" onSubmit={async (e) => { e.preventDefault(); setError(""); const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${location.origin}/admin` }); if (resetError) setError(resetError.message); else setError("Reset email sent. Check your inbox."); }}>
           <label>Email<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
           <button>Send reset email</button>
           <button type="button" className="text-button" onClick={() => setForgot(false)}>Back to sign in</button>
