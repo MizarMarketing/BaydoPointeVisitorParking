@@ -181,9 +181,6 @@ function Register() {
       </form>
       )}
       {mode === "extend" && <ExtendParking options={settings?.duration_options || []} />}
-      <a className="admin-link" href="/admin">
-        Staff login
-      </a>
     </main>
   );
 }
